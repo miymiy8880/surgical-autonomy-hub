@@ -90,7 +90,7 @@
         </div>
     </main>
 
-    <script>
+  <script>
         let imgObj = new Image();
         imgObj.crossOrigin = "anonymous"; 
 
@@ -108,8 +108,31 @@
             imgObj.src = url;
         }
 
+        // Trigger processing automatically once the image is fully fetched
         imgObj.onload = function() {
             processSurgicalFields();
+        };
+
+        // Catch loading errors (e.g., if the file isn't uploaded yet) 
+        // and draw a clean grid blueprint instead of leaving it black
+        imgObj.onerror = function() {
+            const canvases = ['canvasRaw', 'canvasSegmentation', 'canvasVessels', 'canvasCutPlane'];
+            canvases.forEach(id => {
+                const el = document.getElementById(id);
+                const ctx = el.getContext('2d');
+                ctx.fillStyle = "#111827";
+                ctx.fillRect(0, 0, el.width, el.height);
+                ctx.strokeStyle = "#1e293b";
+                ctx.lineWidth = 1;
+                // Draw a diagnostic crosshair grid
+                ctx.beginPath();
+                ctx.moveTo(0, el.height/2); ctx.lineTo(el.width, el.height/2);
+                ctx.moveTo(el.width/2, 0); ctx.lineTo(el.width/2, el.height);
+                ctx.stroke();
+                ctx.fillStyle = "#64748b";
+                ctx.font = "10px monospace";
+                ctx.fillText("[NO NATIVE FRAME FOUND - UPLOAD TO REPO]", 20, el.height/2 + 4);
+            });
         };
 
         function processSurgicalFields() {
@@ -124,37 +147,37 @@
 
             const w = 380; const h = 280;
             
-            // --- TASK 1: Semantic Segmentation (Tissue classification map) ---
+            // --- TASK 1: Semantic Segmentation ---
             let segData = ctxs['canvasSegmentation'].getImageData(0, 0, w, h);
             let d1 = segData.data;
             for (let i = 0; i < d1.length; i += 4) {
                 let intensity = (d1[i] + d1[i+1] + d1[i+2]) / 3;
                 if (intensity > 150) { 
-                    d1[i] = 100; d1[i+1] = 230; d1[i+2] = 50; // Margin classification
+                    d1[i] = 100; d1[i+1] = 230; d1[i+2] = 50; 
                 } else if (intensity > 90) { 
-                    d1[i] = 50; d1[i+1] = 180; d1[i+2] = 230; // Target classification
+                    d1[i] = 50; d1[i+1] = 180; d1[i+2] = 230; 
                 } else { 
-                    d1[i] = 15; d1[i+1] = 20; d1[i+2] = 50; // Safe background tissue cavity
+                    d1[i] = 15; d1[i+1] = 20; d1[i+2] = 50; 
                 }
             }
             ctxs['canvasSegmentation'].putImageData(segData, 0, 0);
 
-            // --- TASK 2: Vessel Criticality Heatmap (No-cut zone identification) ---
+            // --- TASK 2: Vessel Criticality Heatmap ---
             let vesselData = ctxs['canvasVessels'].getImageData(0, 0, w, h);
             let d2 = vesselData.data;
             for (let i = 0; i < d2.length; i += 4) {
                 let intensity = (d2[i] + d2[i+1] + d2[i+2]) / 3;
                 if (intensity > 160) { 
-                    d2[i] = 250; d2[i+1] = 20; d2[i+2] = 20; // Critical danger barrier
+                    d2[i] = 250; d2[i+1] = 20; d2[i+2] = 20; 
                 } else if (intensity > 90) { 
-                    d2[i] = 180; d2[i+1] = 10; d2[i+2] = 10; // High vascularity warning zone
+                    d2[i] = 180; d2[i+1] = 10; d2[i+2] = 10; 
                 } else { 
-                    d2[i] = 20; d2[i+1] = 25; d2[i+2] = 40; // Vascular clearance zone
+                    d2[i] = 20; d2[i+1] = 25; d2[i+2] = 40; 
                 }
             }
             ctxs['canvasVessels'].putImageData(vesselData, 0, 0);
 
-            // --- TASK 3: Incision Vector Prediction (Autonomous linear navigation) ---
+            // --- TASK 3: Incision Vector Prediction ---
             let cutData = ctxs['canvasCutPlane'].getImageData(0, 0, w, h);
             let d3 = cutData.data;
             for (let i = 0; i < d3.length; i += 4) {
@@ -163,7 +186,6 @@
             }
             ctxs['canvasCutPlane'].putImageData(cutData, 0, 0);
             
-            // Drawing the predicted safe trajectory path over the structural architecture
             ctxs['canvasCutPlane'].strokeStyle = "#fbbf24"; 
             ctxs['canvasCutPlane'].lineWidth = 4;
             ctxs['canvasCutPlane'].beginPath();
@@ -171,14 +193,15 @@
             ctxs['canvasCutPlane'].lineTo(w * 0.85, h * 0.70); 
             ctxs['canvasCutPlane'].stroke();
             
-            // Centered end-effector spatial calibration guide-box
             ctxs['canvasCutPlane'].strokeStyle = "#ffffff";
             ctxs['canvasCutPlane'].lineWidth = 1;
             ctxs['canvasCutPlane'].strokeRect((w/2) - 30, (h/2) - 30, 60, 60);
         }
 
-        // Default open-access surgical camera stream frame initialization
-        loadSample('lap_frame1.jpg.jfif');
+        // FORCE INITIALIZATION AFTER EVERYTHING (WINDOW AND MEDIA DOM) FINISHES LOADING
+        window.addEventListener('load', function() {
+            loadSample('mri-abdomen11.jpg');
+        });
     </script>
 </body>
 </html>
