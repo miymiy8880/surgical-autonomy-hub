@@ -50,10 +50,9 @@
 
             <!-- Pre-loaded fallback surgical examples -->
             <div class="border-t border-slate-800 pt-4 flex flex-col gap-2">
-                <span class="block text-xs font-mono text-slate-500 uppercase tracking-widest">CLINICAL SAMPLES:</span>
-                
-                <button onclick="loadSample('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80')" class="w-full text-left bg-slate-950 hover:bg-slate-800 p-2 rounded text-xs border border-slate-800 text-slate-300 font-mono transition">
-                    ⚡ [LOAD] Open Surgery Reference Frame
+                <span class="block text-xs font-mono text-slate-500 uppercase tracking-widest">CONTROL PANEL:</span>
+                <button onclick="generateProceduralField()" class="w-full text-left bg-emerald-950/40 hover:bg-emerald-900/60 p-2 rounded text-xs border border-emerald-800 text-emerald-300 font-mono transition">
+                    🔄 [RESET] Generate Internal Matrix View
                 </button>
             </div>
 
@@ -103,115 +102,133 @@
     </main>
 
     <script>
-        let imgObj = new Image();
-        imgObj.crossOrigin = "anonymous"; 
+        const w = 380;
+        const h = 280;
 
+        // Handles user local file uploads cleanly
         function handleImage(input) {
             if (input.files && input.files[0]) {
                 let reader = new FileReader();
                 reader.onload = function (e) {
+                    let imgObj = new Image();
+                    imgObj.onload = function() {
+                        const canvases = ['canvasRaw', 'canvasSegmentation', 'canvasVessels', 'canvasCutPlane'];
+                        canvases.forEach(id => {
+                            const ctx = document.getElementById(id).getContext('2d');
+                            ctx.drawImage(imgObj, 0, 0, w, h);
+                        });
+                        processSurgicalFields();
+                    };
                     imgObj.src = e.target.result;
                 };
                 reader.readAsDataURL(input.files[0]);
             }
         }
 
-        function loadSample(url) {
-            imgObj.src = url;
+        // Generates an explicit procedural canvas map so there are NO external asset dependencies
+        function generateProceduralField() {
+            const canvasRaw = document.getElementById('canvasRaw');
+            const ctx = canvasRaw.getContext('2d');
+
+            // Draw base deep tissue gradient background
+            let gradient = ctx.createRadialGradient(w/2, h/2, 50, w/2, h/2, w*0.6);
+            gradient.addColorStop(0, '#5c1d1d');
+            gradient.addColorStop(0.5, '#3b0f0f');
+            gradient.addColorStop(1, '#170505');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw a precise anatomical target structure (e.g. gallbladder or tissue mass layout)
+            ctx.fillStyle = '#9e7a28';
+            ctx.beginPath();
+            ctx.arc(w * 0.45, h * 0.45, 45, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw secondary critical vascular structural lines
+            ctx.strokeStyle = '#991b1b';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, h * 0.7);
+            ctx.quadraticCurveTo(w * 0.4, h * 0.6, w * 0.5, h);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.2, 0);
+            ctx.quadraticCurveTo(w * 0.3, h * 0.4, w * 0.8, h * 0.5);
+            ctx.stroke();
+
+            // Clone to all task matrices instantly
+            const otherCanvases = ['canvasSegmentation', 'canvasVessels', 'canvasCutPlane'];
+            otherCanvases.forEach(id => {
+                const targetCtx = document.getElementById(id).getContext('2d');
+                targetCtx.drawImage(canvasRaw, 0, 0);
+            });
+
+            processSurgicalFields();
         }
 
-        imgObj.onload = function() {
-            processSurgicalFields();
-        };
-
-        // Network error visual overlay
-        imgObj.onerror = function() {
-            const canvases = ['canvasRaw', 'canvasSegmentation', 'canvasVessels', 'canvasCutPlane'];
-            canvases.forEach(id => {
-                const el = document.getElementById(id);
-                const ctx = el.getContext('2d');
-                ctx.fillStyle = "#111827";
-                ctx.fillRect(0, 0, el.width, el.height);
-                ctx.strokeStyle = "#ef4444";
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(0, 0); ctx.lineTo(el.width, el.height);
-                ctx.moveTo(el.width, 0); ctx.lineTo(0, el.height);
-                ctx.stroke();
-                ctx.fillStyle = "#f87171";
-                ctx.font = "10px monospace";
-                ctx.fillText("[ROBOTIC INTERFACE PATH ERROR]", 30, el.height/2);
-            });
-        };
-
         function processSurgicalFields() {
-            const canvases = ['canvasRaw', 'canvasSegmentation', 'canvasVessels', 'canvasCutPlane'];
-            const ctxs = {};
+            const ctxSegmentation = document.getElementById('canvasSegmentation').getContext('2d');
+            const ctxVessels = document.getElementById('canvasVessels').getContext('2d');
+            const ctxCutPlane = document.getElementById('canvasCutPlane').getContext('2d');
             
-            canvases.forEach(id => {
-                const el = document.getElementById(id);
-                ctxs[id] = el.getContext('2d');
-                ctxs[id].drawImage(imgObj, 0, 0, el.width, el.height);
-            });
-
-            const w = 380; const h = 280;
-            
-            // --- TASK 1: Semantic Segmentation ---
-            let segData = ctxs['canvasSegmentation'].getImageData(0, 0, w, h);
+            // --- TASK 1: Semantic Segmentation Map ---
+            let segData = ctxSegmentation.getImageData(0, 0, w, h);
             let d1 = segData.data;
             for (let i = 0; i < d1.length; i += 4) {
-                let intensity = (d1[i] + d1[i+1] + d1[i+2]) / 3;
-                if (intensity > 150) { 
-                    d1[i] = 100; d1[i+1] = 230; d1[i+2] = 50; 
-                } else if (intensity > 90) { 
-                    d1[i] = 50; d1[i+1] = 180; d1[i+2] = 230; 
+                // Read red channel dominance
+                if (d1[i] > 140 && d1[i+1] > 110) { 
+                    d1[i] = 50; d1[i+1] = 180; d1[i+2] = 240; // Target organ structure -> Sky blue
+                } else if (d1[i] > 80) { 
+                    d1[i] = 110; d1[i+1] = 230; d1[i+2] = 60; // Margins -> Lime
                 } else { 
-                    d1[i] = 15; d1[i+1] = 20; d1[i+2] = 50; 
+                    d1[i] = 15; d1[i+1] = 23; d1[i+2] = 42; // Dark background cavities
                 }
             }
-            ctxs['canvasSegmentation'].putImageData(segData, 0, 0);
+            ctxSegmentation.putImageData(segData, 0, 0);
 
             // --- TASK 2: Vessel Criticality Heatmap ---
-            let vesselData = ctxs['canvasVessels'].getImageData(0, 0, w, h);
+            let vesselData = ctxVessels.getImageData(0, 0, w, h);
             let d2 = vesselData.data;
             for (let i = 0; i < d2.length; i += 4) {
-                let intensity = (d2[i] + d2[i+1] + d2[i+2]) / 3;
-                if (intensity > 160) { 
-                    d2[i] = 250; d2[i+1] = 20; d2[i+2] = 20; 
-                } else if (intensity > 90) { 
-                    d2[i] = 180; d2[i+1] = 10; d2[i+2] = 10; 
+                if (d2[i] > 140 && d2[i+1] < 50) { 
+                    d2[i] = 244; d2[i+1] = 63; d2[i+2] = 94; // Bright critical structural vessels -> Rose
+                } else if (d2[i] > 80 && d2[i+1] < 40) { 
+                    d2[i] = 159; d2[i+1] = 18; d2[i+2] = 57; // Deeper vessels -> Maroon
                 } else { 
-                    d2[i] = 20; d2[i+1] = 25; d2[i+2] = 40; 
+                    d2[i] = 15; d2[i+1] = 23; d2[i+2] = 42; 
                 }
             }
-            ctxs['canvasVessels'].putImageData(vesselData, 0, 0);
+            ctxVessels.putImageData(vesselData, 0, 0);
 
             // --- TASK 3: Incision Vector Prediction ---
-            let cutData = ctxs['canvasCutPlane'].getImageData(0, 0, w, h);
+            let cutData = ctxCutPlane.getImageData(0, 0, w, h);
             let d3 = cutData.data;
             for (let i = 0; i < d3.length; i += 4) {
                 let gray = (d3[i] + d3[i+1] + d3[i+2]) / 3;
-                d3[i] = d3[i+1] = d3[i+2] = gray * 0.4; 
+                d3[i] = d3[i+1] = d3[i+2] = gray * 0.4; // Mute color space to monochrome for vector contrast
             }
-            ctxs['canvasCutPlane'].putImageData(cutData, 0, 0);
+            ctxCutPlane.putImageData(cutData, 0, 0);
             
-            ctxs['canvasCutPlane'].strokeStyle = "#fbbf24"; 
-            ctxs['canvasCutPlane'].lineWidth = 4;
-            ctxs['canvasCutPlane'].beginPath();
-            ctxs['canvasCutPlane'].moveTo(w * 0.15, h * 0.35); 
-            ctxs['canvasCutPlane'].lineTo(w * 0.85, h * 0.70); 
-            ctxs['canvasCutPlane'].stroke();
+            // Draw planned incision path line vector
+            ctxCutPlane.strokeStyle = "#fbbf24"; 
+            ctxCutPlane.lineWidth = 4;
+            ctxCutPlane.beginPath();
+            ctxCutPlane.moveTo(w * 0.25, h * 0.35); 
+            ctxCutPlane.lineTo(w * 0.70, h * 0.65); 
+            ctxCutPlane.stroke();
             
-            ctxs['canvasCutPlane'].strokeStyle = "#ffffff";
-            ctxs['canvasCutPlane'].lineWidth = 1;
-            ctxs['canvasCutPlane'].strokeRect((w/2) - 30, (h/2) - 30, 60, 60);
+            // Draw visual targeting reticle
+            ctxCutPlane.strokeStyle = "#ffffff";
+            ctxCutPlane.lineWidth = 1;
+            ctxCutPlane.strokeRect((w/2) - 25, (h/2) - 25, 50, 50);
         }
 
-        // Using a highly trusted open-source web domain asset to stop cross-origin errors
-        window.addEventListener('load', function() {
-            loadSample('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80');
-        });
+        // Initialize perfectly on load without tracking external files
+        window.addEventListener('load', generateProceduralField);
     </script>
 </body>
-                                                                   </html>
-  
+</html>
