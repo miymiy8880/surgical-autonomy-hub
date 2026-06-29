@@ -2,7 +2,7 @@
 
 Visceral Vision v2.0 upgrades the core simulation matrix into a polished, high-fidelity Surgical HUD (Heads-Up Display). Optimized for deployment on cloud hosting platforms like GitHub Pages, v2.0 integrates modern utility-first styling with dynamic repository asset resolving to create an immersive, responsive frontend template ready for medical AI integration.
 
-Live Demo: [Insert Your GitHub Pages Link Here]
+Live Demo: https://miymiy8880.github.io/surgical-autonomy-hub/
 
 ## New Features in v2.0
 - Medical Software Aesthetic: Redesigned from the ground up using Tailwind CSS to mirror the high-contrast, dark-mode styling of modern endoscopy camera towers and robotic surgical consoles.
